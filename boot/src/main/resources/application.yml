@@ -30,17 +30,13 @@ fwkcna:
     consumer:
       interceptor-default-enabled: true
       topics:
-        groups:
-          employee:
-            main: ${KAFKA_TOPIC_EMPLOYEE:thirdparty.employee.employee.event.public.v0.table.cpd}
-            groupId: ${KAFKA_GROUP_ID_EMPLOYEE:thirdparty_employee_employee_prueba-back-snk-digital-document}
+        input-0: ${KAFKA_TOPIC_EMPLOYEE:thirdparty.employee.employee.event.public.v0.table.cpd}
+        groupid-0: ${KAFKA_GROUP_ID_EMPLOYEE:thirdparty_employee_employee_prueba-back-snk-digital-document}
       error-type: NONE
 
 outbox:
   topic:
     employee-digital-document: ${KAFKA_TOPIC_OUTPUT:thirdparty.employee.employeedigitaldocument.event.restrictedout.v0.table.cpd}
-  publisher:
-    delay-ms: ${OUTBOX_PUBLISHER_DELAY_MS:5000}
   jpa:
     repository:
       datasource:

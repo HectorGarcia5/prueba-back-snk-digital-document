@@ -16,10 +16,8 @@ fwkcna:
   kafka:
     consumer:
       topics:
-        groups:
-          employee:
-            main: thirdparty.employee.employee.event.public.v0.table.cpd
-            groupId: thirdparty_employee_employee_prueba-back-snk-digital-document
+        input-0: thirdparty.employee.employee.event.public.v0.table.cpd
+        groupid-0: thirdparty_employee_employee_prueba-back-snk-digital-document
   buckets:
     - id: employee-documents
       bucket-name: employee-documents

@@ -1,29 +1,25 @@
 package com.mercadona.prueba.snk.digitaldocument.application.services;
 
-import com.mercadona.prueba.snk.digitaldocument.application.outbox.OutboxEvent;
 import com.mercadona.prueba.snk.digitaldocument.application.ports.driven.DocumentRepository;
-import com.mercadona.prueba.snk.digitaldocument.application.ports.driven.OutboxRepository;
+import com.mercadona.prueba.snk.digitaldocument.application.ports.driven.OutboxEventPort;
 import com.mercadona.prueba.snk.digitaldocument.domain.DigitalDocument;
 import com.mercadona.prueba.snk.digitaldocument.domain.EmployeeData;
 import com.mercadona.prueba.snk.digitaldocument.domain.FailedStep;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
-
-import java.time.OffsetDateTime;
-import java.util.UUID;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Handles all document state transitions as atomic DB operations.
- * Each method runs in a single transaction so the domain state and
- * any side-effects (e.g. Outbox event creation) are committed together.
+ * Handles document state transitions as atomic DB operations.
+ * Each method runs in a single @Transactional so domain state and side-effects
+ * (Outbox event creation) are committed together.
  */
 @Service
 @RequiredArgsConstructor
 public class DocumentStateService {
 
   private final DocumentRepository documentRepository;
-  private final OutboxRepository outboxRepository;
+  private final OutboxEventPort outboxEventPort;
 
   @Transactional
   public void transitionToEnriched(DigitalDocument document, EmployeeData employeeData) {
@@ -38,29 +34,19 @@ public class DocumentStateService {
   }
 
   /**
-   * Atomically transitions to STORED and creates the Outbox event.
-   * This is the critical consistency boundary: no Kafka event is ever published
-   * unless the document has been successfully persisted as STORED.
+   * Atomically: STORED → Outbox event created → PUBLISHED.
+   * All three operations commit together. If the transaction rolls back,
+   * no Outbox event is created and the document stays in PDF_GENERATED.
+   * The framework's auto-publisher handles Kafka delivery (at-least-once).
    */
   @Transactional
   public void transitionToStored(DigitalDocument document, String storageKey) {
     document.markStored(storageKey);
     documentRepository.save(document);
-    outboxRepository.save(OutboxEvent.createInitial(
-        document.getId(), document.getEmployeeId(), document.getManagedGroupId()));
-  }
-
-  /**
-   * Atomically marks the Outbox event as published and transitions the document to PUBLISHED.
-   * Called after Kafka has confirmed the message delivery.
-   */
-  @Transactional
-  public void completePublication(UUID outboxEventId, UUID documentId) {
-    outboxRepository.markPublished(outboxEventId, OffsetDateTime.now());
-    documentRepository.findById(documentId).ifPresent(doc -> {
-      doc.markPublished();
-      documentRepository.save(doc);
-    });
+    outboxEventPort.saveForPublication(
+        document.getId(), document.getEmployeeId(), document.getManagedGroupId());
+    document.markPublished();
+    documentRepository.save(document);
   }
 
   @Transactional
