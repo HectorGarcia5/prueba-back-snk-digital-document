@@ -77,6 +77,12 @@ clients:
 storage:
   bucket-id: ${STORAGE_BUCKET_ID:employee-documents}
 
+metric:
+  error:
+    table-name: '"digital_document".topic_consumer_error'
+    microservice-name: prueba-back-snk-digital-document
+    metric-name: prueba_snk_error_topicconsume_total
+
 resilience4j:
   retry:
     instances:

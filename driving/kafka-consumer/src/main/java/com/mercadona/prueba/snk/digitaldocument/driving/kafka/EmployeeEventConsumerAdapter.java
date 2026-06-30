@@ -13,9 +13,6 @@ import org.springframework.stereotype.Component;
 import thirdparty.employee.employee.EmployeeEventPublicKey;
 import thirdparty.employee.employee.EmployeeEventPublicValue;
 
-import java.time.Duration;
-import java.util.UUID;
-
 @Slf4j
 @Component
 public class EmployeeEventConsumerAdapter
@@ -24,17 +21,20 @@ public class EmployeeEventConsumerAdapter
   private final ReceiveEmployeeEventPort receiveUseCase;
   private final ProcessDigitalDocumentPort processUseCase;
   private final RepublishDigitalDocumentPort republishUseCase;
+  private final ControlExceptionService controlExceptionService;
 
   public EmployeeEventConsumerAdapter(
       @Value("${kafka.employee.topic}") final String topic,
       @Value("${kafka.employee.group-id}") final String groupId,
       ReceiveEmployeeEventPort receiveUseCase,
       ProcessDigitalDocumentPort processUseCase,
-      RepublishDigitalDocumentPort republishUseCase) {
+      RepublishDigitalDocumentPort republishUseCase,
+      ControlExceptionService controlExceptionService) {
     super(new String[]{topic}, groupId);
     this.receiveUseCase = receiveUseCase;
     this.processUseCase = processUseCase;
     this.republishUseCase = republishUseCase;
+    this.controlExceptionService = controlExceptionService;
   }
 
   @Override
@@ -49,14 +49,14 @@ public class EmployeeEventConsumerAdapter
     }
 
     var key = consumerRecord.key();
-    String employeeId    = String.valueOf(key.getId());
+    String employeeId     = String.valueOf(key.getId());
     String managedGroupId = String.valueOf(key.getManagedGroupId().getId());
 
     log.info("event=CONSUMER_RECEIVED employeeId={} managedGroupId={}", employeeId, managedGroupId);
 
     try {
-      var response  = receiveUseCase.receive(employeeId, managedGroupId);
-      var result    = response.result();
+      var response   = receiveUseCase.receive(employeeId, managedGroupId);
+      var result     = response.result();
       var documentId = response.documentId();
 
       switch (result) {
@@ -79,8 +79,9 @@ public class EmployeeEventConsumerAdapter
     } catch (Exception e) {
       log.error("event=CONSUMER_ERROR employeeId={} managedGroupId={} error={}",
           employeeId, managedGroupId, e.getMessage(), e);
-      ack.nack(Duration.ZERO);
+      controlExceptionService.controlException(
+          consumerRecord.key(), consumerRecord.value(), e, consumerRecord);
+      ack.acknowledge();
     }
   }
-
 }
