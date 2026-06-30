@@ -17,7 +17,7 @@ public class AvroSerializer<T extends SpecificRecordBase> {
       writer.write(data, encoder);
       encoder.flush();
       return out.toString();
-    } catch (IOException ex) {
+    } catch (Exception ex) {
       throw new IllegalStateException("Error serializing Avro record: " + ex.getMessage(), ex);
     }
   }
