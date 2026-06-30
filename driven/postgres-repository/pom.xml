@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <artifactId>prueba-back-snk-digital-document-postgres-repository</artifactId>
+  <packaging>jar</packaging>
+  <name>prueba-back-snk-digital-document-postgres-repository</name>
+
+  <parent>
+    <groupId>com.mercadona.prueba.snk-digital-document</groupId>
+    <artifactId>prueba-back-snk-digital-document</artifactId>
+    <version>1.0.0-SNAPSHOT</version>
+    <relativePath>../../pom.xml</relativePath>
+  </parent>
+
+  <dependencies>
+    <dependency>
+      <groupId>com.mercadona.prueba.snk-digital-document</groupId>
+      <artifactId>prueba-back-snk-digital-document-application</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>com.mercadona.framework.cna</groupId>
+      <artifactId>fwkcna-starter-jpa-repository</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.postgresql</groupId>
+      <artifactId>postgresql</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>com.mercadona.framework.cna</groupId>
+      <artifactId>fwkcna-starter-outbox-avro-jpa-register</artifactId>
+    </dependency>
+    <!-- Avro schema: tópico de salida employee-digital-document -->
+    <dependency>
+      <groupId>com.mercadona.kafka.schemas.concepto.thirdparty.employee.employeedigitaldocument</groupId>
+      <artifactId>employeedigitaldocumentv0</artifactId>
+      <version>1.1.0</version>
+    </dependency>
+  </dependencies>
+
+  <build>
+    <resources>
+      <resource>
+        <directory>sql</directory>
+        <includes>
+          <include>**/*.sql</include>
+        </includes>
+        <filtering>true</filtering>
+      </resource>
+    </resources>
+  </build>
+
+</project>

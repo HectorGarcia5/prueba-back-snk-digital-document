@@ -1,0 +1,57 @@
+spring:
+  application:
+    name: prueba-back-snk-digital-document
+  datasource:
+    username: ${DATABASE_USERNAME}
+    password: ${DATABASE_PASSWORD}
+    url: ${DATABASE_PREFIX}${DATABASE_URL}/${DATABASE_NAME}
+    driver-class-name: org.postgresql.Driver
+    hikari:
+      schema: ${DATABASE_SCHEMA}
+      poolName: SpringBootJPAHikariCP
+      minimumIdle: 2
+      maximumPoolSize: 10
+      idleTimeout: 30000
+      maxLifetime: 2000000
+      connectionTimeout: 30000
+      initializationFailTimeout: 0
+  jpa:
+    properties:
+      hibernate:
+        timezone:
+          default_storage: NORMALIZE
+  flyway:
+    locations: classpath:migration/versions
+    schemas: ${DATABASE_SCHEMA}
+
+fwkcna:
+  kafka:
+    enabled: true
+    consumer:
+      interceptor-default-enabled: true
+      topics:
+        input-0: ${KAFKA_TOPIC_EMPLOYEE}
+        groupid-0: ${KAFKA_GROUP_ID_EMPLOYEE}
+      error-type: NONE
+  jpa:
+    repository:
+      datasource:
+        startup-connectivity-check: false
+
+clients:
+  certification:
+    url: ${CERTIFICATION_API_BASE_PATH:http://localhost:8081}
+
+management:
+  endpoint:
+    metrics:
+      enabled: true
+    prometheus:
+      enabled: true
+  endpoints:
+    web:
+      exposure:
+        include: [info, health, metrics, prometheus]
+
+server:
+  port: 8080

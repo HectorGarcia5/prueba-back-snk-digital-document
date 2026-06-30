@@ -1,0 +1,23 @@
+spring:
+  datasource:
+    url: jdbc:postgresql://localhost:5432/digital_document
+    username: sa
+    password: root
+    driver-class-name: org.postgresql.Driver
+    hikari:
+      schema: digital_document
+      initializationFailTimeout: -1
+  flyway:
+    locations: classpath:migration/versions
+    schemas: digital_document
+
+fwkcna:
+  kafka:
+    consumer:
+      topics:
+        input-0: thirdparty.employee.employee.event.public.v0.table.cpd
+        groupid-0: thirdparty_employee_employee_prueba-back-snk-digital-document
+
+clients:
+  certification:
+    url: http://localhost:8081

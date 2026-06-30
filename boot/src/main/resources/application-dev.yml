@@ -1,0 +1,22 @@
+spring:
+  datasource:
+    url: ${DATABASE_PREFIX}${DATABASE_URL}/${DATABASE_NAME}
+    hikari:
+      schema: ${DATABASE_SCHEMA}
+      initializationFailTimeout: 0
+  kafka:
+    properties:
+      basic.auth.credentials.source: "USER_INFO"
+      schema:
+        registry:
+          url: ${SCHEMA_REGISTRY_URL}
+          basic.auth.user.info: "${KAFKA_USER}:${KAFKA_PASSWORD}"
+      security:
+        protocol: "SASL_SSL"
+      sasl:
+        mechanism: "PLAIN"
+        jaas.config: "org.apache.kafka.common.security.plain.PlainLoginModule required username='${KAFKA_USER}' password='${KAFKA_PASSWORD}';"
+    consumer:
+      bootstrap-servers: ${BOOTSTRAP_SERVER}
+      auto-offset-reset: latest
+      enable-auto-commit: false

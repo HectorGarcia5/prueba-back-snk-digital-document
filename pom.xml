@@ -1,0 +1,57 @@
+<project xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xmlns="http://maven.apache.org/POM/4.0.0"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <groupId>com.mercadona.prueba.snk-digital-document</groupId>
+  <artifactId>prueba-back-snk-digital-document</artifactId>
+  <version>1.0.0-SNAPSHOT</version>
+  <packaging>pom</packaging>
+  <name>prueba-back-snk-digital-document</name>
+
+  <parent>
+    <groupId>com.mercadona.framework.cna</groupId>
+    <artifactId>fwkcna-parent</artifactId>
+    <version>5.2.1</version>
+  </parent>
+
+  <dependencyManagement>
+    <dependencies>
+      <dependency>
+        <groupId>com.mercadona.prueba.snk-digital-document</groupId>
+        <artifactId>prueba-back-snk-digital-document-application</artifactId>
+        <version>${project.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>com.mercadona.prueba.snk-digital-document</groupId>
+        <artifactId>prueba-back-snk-digital-document-kafka-consumer</artifactId>
+        <version>${project.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>com.mercadona.prueba.snk-digital-document</groupId>
+        <artifactId>prueba-back-snk-digital-document-postgres-repository</artifactId>
+        <version>${project.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>com.mercadona.prueba.snk-digital-document</groupId>
+        <artifactId>prueba-back-snk-digital-document-certification-client</artifactId>
+        <version>${project.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>com.mercadona.prueba.snk-digital-document</groupId>
+        <artifactId>prueba-back-snk-digital-document-s3-storage</artifactId>
+        <version>${project.version}</version>
+      </dependency>
+    </dependencies>
+  </dependencyManagement>
+
+  <modules>
+    <module>application</module>
+    <module>driving/kafka-consumer</module>
+    <module>driven/postgres-repository</module>
+    <module>driven/certification-client</module>
+    <module>driven/s3-storage</module>
+    <module>boot</module>
+  </modules>
+
+</project>
