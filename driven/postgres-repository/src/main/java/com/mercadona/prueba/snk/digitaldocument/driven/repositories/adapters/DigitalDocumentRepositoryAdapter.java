@@ -3,9 +3,11 @@ package com.mercadona.prueba.snk.digitaldocument.driven.repositories.adapters;
 import com.mercadona.prueba.snk.digitaldocument.application.ports.driven.DocumentRepository;
 import com.mercadona.prueba.snk.digitaldocument.domain.DigitalDocument;
 import com.mercadona.prueba.snk.digitaldocument.domain.DocumentStatus;
+import com.mercadona.prueba.snk.digitaldocument.domain.exception.DocumentAlreadyExistsException;
 import com.mercadona.prueba.snk.digitaldocument.driven.repositories.DigitalDocumentJpaRepository;
 import com.mercadona.prueba.snk.digitaldocument.driven.repositories.mappers.DigitalDocumentMapper;
 import lombok.RequiredArgsConstructor;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Component;
 
@@ -22,9 +24,13 @@ public class DigitalDocumentRepositoryAdapter implements DocumentRepository {
 
   @Override
   public DigitalDocument save(DigitalDocument document) {
-    var mo = mapper.toMO(document);
-    var saved = jpaRepository.saveAndFlush(mo);
-    return mapper.toDomain(saved);
+    try {
+      var mo = mapper.toMO(document);
+      var saved = jpaRepository.saveAndFlush(mo);
+      return mapper.toDomain(saved);
+    } catch (DataIntegrityViolationException e) {
+      throw new DocumentAlreadyExistsException(document.getEmployeeId(), document.getManagedGroupId());
+    }
   }
 
   @Override
