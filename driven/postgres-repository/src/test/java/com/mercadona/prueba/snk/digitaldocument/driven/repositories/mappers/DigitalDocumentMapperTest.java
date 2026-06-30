@@ -2,6 +2,8 @@ package com.mercadona.prueba.snk.digitaldocument.driven.repositories.mappers;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import com.mercadona.prueba.snk.digitaldocument.domain.DigitalDocument;
 import com.mercadona.prueba.snk.digitaldocument.domain.DocumentStatus;
 import com.mercadona.prueba.snk.digitaldocument.domain.EmployeeData;
@@ -10,18 +12,29 @@ import com.mercadona.prueba.snk.digitaldocument.driven.repositories.models.Digit
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.UUID;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mapstruct.factory.Mappers;
 
 class DigitalDocumentMapperTest {
 
-  private final DigitalDocumentMapper mapper = Mappers.getMapper(DigitalDocumentMapper.class);
+  private DigitalDocumentMapper mapper;
 
   private static final UUID ID              = UUID.fromString("11111111-1111-1111-1111-111111111111");
   private static final String EMPLOYEE_ID   = "EMP-MAP-001";
   private static final String GROUP_ID      = "GRP-MAP-001";
   private static final OffsetDateTime NOW   = OffsetDateTime.of(2024, 6, 15, 10, 0, 0, 0, ZoneOffset.UTC);
+
+
+  @BeforeEach
+  void setUp() throws Exception {
+    mapper = Mappers.getMapper(DigitalDocumentMapper.class);
+    var field = DigitalDocumentMapper.class.getDeclaredField("objectMapper");
+    field.setAccessible(true);
+    var objectMapper = new ObjectMapper().registerModule(new JavaTimeModule());
+    field.set(mapper, objectMapper);
+  }
 
   // ---------------------------------------------------------------------------
   // 1. Roundtrip completo con todos los campos
@@ -61,8 +74,6 @@ class DigitalDocumentMapperTest {
     assertThat(mo.getManagedGroupId()).isEqualTo(GROUP_ID);
     assertThat(mo.getStatus()).isEqualTo(DocumentStatus.ENRICHED);
     assertThat(mo.getFailedStep()).isNull();
-    assertThat(mo.getEmpEmployeeId()).isEqualTo(EMPLOYEE_ID);
-    assertThat(mo.getEmpManagedGroupId()).isEqualTo(GROUP_ID);
     assertThat(mo.getStorageKey()).isEqualTo("bucket/path/doc.pdf");
     assertThat(mo.getChecksum()).isEqualTo("sha256-abc123");
     assertThat(mo.getRetryCount()).isEqualTo(2);
@@ -94,7 +105,7 @@ class DigitalDocumentMapperTest {
   // ---------------------------------------------------------------------------
 
   @Test
-  @DisplayName("Should map null employeeData to null emp fields and reconstruct null employeeData on toDomain")
+  @DisplayName("Should map null employeeData to null and reconstruct null employeeData on toDomain")
   void should_map_null_employee_data_to_null() {
     var domain = DigitalDocument.builder()
         .id(ID)
@@ -109,9 +120,6 @@ class DigitalDocumentMapperTest {
         .build();
 
     var mo = mapper.toMO(domain);
-
-    assertThat(mo.getEmpEmployeeId()).isNull();
-    assertThat(mo.getEmpManagedGroupId()).isNull();
 
     var roundtrip = mapper.toDomain(mo);
 

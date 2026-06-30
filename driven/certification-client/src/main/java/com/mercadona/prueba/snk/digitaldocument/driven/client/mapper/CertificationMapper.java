@@ -10,7 +10,6 @@ import org.mapstruct.Mapping;
 @Mapper(componentModel = "spring")
 public interface CertificationMapper {
 
-  @Mapping(target = "valid", source = "isValid")
   AiCertificationData toDomain(AiCertificationDataDto dto);
 
   EmployeeData toDomain(EmployeeDataDto dto);

@@ -6,18 +6,57 @@ spring:
     driver-class-name: org.postgresql.Driver
     hikari:
       schema: digital_document
+      poolName: SpringBootJPAHikariCP
+      minimumIdle: 2
+      maximumPoolSize: 10
+      idleTimeout: 30000
+      maxLifetime: 2000000
+      connectionTimeout: 30000
       initializationFailTimeout: -1
+
   flyway:
     locations: classpath:migration/versions
     schemas: digital_document
     create-schemas: true
 
+  kafka:
+    bootstrap-servers: localhost:29092
+    properties:
+      "[schema.registry.url]": http://localhost:9081
+      "[security.protocol]": PLAINTEXT
+    consumer:
+      bootstrap-servers: localhost:29092
+      auto-offset-reset: latest
+      enable-auto-commit: false
+      properties:
+        key.deserializer: io.confluent.kafka.serializers.KafkaAvroDeserializer
+        value.deserializer: io.confluent.kafka.serializers.KafkaAvroDeserializer
+        auto.offset.reset: latest
+        "[schema.registry.url]": http://localhost:9081
+        "[security.protocol]": PLAINTEXT
+    listener:
+      ack-mode: manual
+
+  jpa:
+    hibernate:
+      ddl-auto: none
+
 fwkcna:
   kafka:
+    enabled: true
     consumer:
-      topics:
-        input-0: thirdparty.employee.employee.event.public.v0.table.cpd
-        groupid-0: thirdparty_employee_employee_prueba-back-snk-digital-document
+      interceptor-default-enabled: true
+      error-type: NONE
+  outbox:
+    enabled: true
+    table-name: o_outbox
+    schema-registries:
+      sr-basic:
+        url: http://localhost:9081
+        authentication:
+          basic:
+            user: ""
+            password: ""
   buckets:
     - id: employee-documents
       bucket-name: employee-documents
@@ -35,3 +74,7 @@ fwkcna:
 clients:
   certification:
     url: http://localhost:8081
+
+outbox:
+  topic:
+    employee-digital-document: thirdparty.employee.employeedigitaldocument.event.restrictedout.v0.table.cpd

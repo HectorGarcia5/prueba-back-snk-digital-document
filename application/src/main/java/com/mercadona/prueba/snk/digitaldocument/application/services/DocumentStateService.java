@@ -42,11 +42,11 @@ public class DocumentStateService {
   @Transactional
   public void transitionToStored(DigitalDocument document, String storageKey) {
     document.markStored(storageKey);
-    documentRepository.save(document);
+    var stored = documentRepository.save(document);
     outboxEventPort.saveForPublication(
-        document.getId(), document.getEmployeeId(), document.getManagedGroupId());
-    document.markPublished();
-    documentRepository.save(document);
+        stored.getId(), stored.getEmployeeId(), stored.getManagedGroupId());
+    stored.markPublished();
+    documentRepository.save(stored);
   }
 
   @Transactional

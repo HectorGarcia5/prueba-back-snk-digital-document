@@ -22,7 +22,8 @@
     </dependency>
     <dependency>
       <groupId>com.mercadona.framework.cna</groupId>
-      <artifactId>fwkcna-starter-kafka</artifactId>
+      <artifactId>fwkcna-starter-kafka-consumer</artifactId>
+      <version>5.0.2</version>
     </dependency>
     <!-- Avro schema: tópico de entrada employee -->
     <dependency>

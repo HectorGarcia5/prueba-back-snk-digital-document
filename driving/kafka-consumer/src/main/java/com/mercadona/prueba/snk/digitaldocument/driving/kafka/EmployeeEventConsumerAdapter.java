@@ -1,47 +1,40 @@
 package com.mercadona.prueba.snk.digitaldocument.driving.kafka;
 
 import com.mercadona.framework.cna.lib.kafka.consumer.MercadonaKafkaManualAckConsumerListener;
-import com.mercadona.framework.cna.lib.outbox.avro.jpa.register.service.OutBoxAvroJPAService;
 import com.mercadona.prueba.snk.digitaldocument.application.ports.driving.ProcessDigitalDocumentPort;
 import com.mercadona.prueba.snk.digitaldocument.application.ports.driving.ReceiveEmployeeEventPort;
+import com.mercadona.prueba.snk.digitaldocument.application.ports.driving.RepublishDigitalDocumentPort;
 import jakarta.annotation.Nullable;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.context.annotation.Profile;
 import org.springframework.kafka.support.Acknowledgment;
 import org.springframework.stereotype.Component;
 import thirdparty.employee.employee.EmployeeEventPublicKey;
 import thirdparty.employee.employee.EmployeeEventPublicValue;
-import thirdparty.employee.employeedigitaldocument.v0.EmployeeDigitalDocumentEventRestrictedOutKey;
-import thirdparty.employee.employeedigitaldocument.v0.EmployeeDigitalDocumentEventRestrictedOutValue;
 
 import java.time.Duration;
 import java.util.UUID;
 
 @Slf4j
 @Component
-@Profile("!local")
 public class EmployeeEventConsumerAdapter
     extends MercadonaKafkaManualAckConsumerListener<EmployeeEventPublicKey, EmployeeEventPublicValue> {
 
   private final ReceiveEmployeeEventPort receiveUseCase;
   private final ProcessDigitalDocumentPort processUseCase;
-  private final OutBoxAvroJPAService outBoxAvroJPAService;
-
-  @Value("${outbox.topic.employee-digital-document}")
-  private String outputTopic;
+  private final RepublishDigitalDocumentPort republishUseCase;
 
   public EmployeeEventConsumerAdapter(
-      @Value("${fwkcna.kafka.consumer.topics.input-0}") final String[] topics,
-      @Value("${fwkcna.kafka.consumer.topics.groupid-0}") final String groupId,
+      @Value("${kafka.employee.topic}") final String topic,
+      @Value("${kafka.employee.group-id}") final String groupId,
       ReceiveEmployeeEventPort receiveUseCase,
       ProcessDigitalDocumentPort processUseCase,
-      OutBoxAvroJPAService outBoxAvroJPAService) {
-    super(topics, groupId);
+      RepublishDigitalDocumentPort republishUseCase) {
+    super(new String[]{topic}, groupId);
     this.receiveUseCase = receiveUseCase;
     this.processUseCase = processUseCase;
-    this.outBoxAvroJPAService = outBoxAvroJPAService;
+    this.republishUseCase = republishUseCase;
   }
 
   @Override
@@ -73,7 +66,7 @@ public class EmployeeEventConsumerAdapter
         }
         case DUPLICATE_READY_TO_REPUBLISH -> {
           log.info("event=CONSUMER_DUPLICATE_REPUBLISH documentId={}", documentId);
-          publishToOutbox(documentId, employeeId, managedGroupId);
+          republishUseCase.republish(documentId, employeeId, managedGroupId);
         }
         case DUPLICATE_IN_PROGRESS ->
             log.info("event=CONSUMER_DUPLICATE_IN_PROGRESS documentId={}", documentId);
@@ -90,26 +83,4 @@ public class EmployeeEventConsumerAdapter
     }
   }
 
-  private void publishToOutbox(UUID documentId, String employeeId, String managedGroupId) {
-    var avroKey = buildKey(documentId, employeeId, managedGroupId);
-    var avroValue = buildValue(documentId, employeeId, managedGroupId);
-    outBoxAvroJPAService.save(avroKey, avroValue, outputTopic);
-  }
-
-  private EmployeeDigitalDocumentEventRestrictedOutKey buildKey(
-      UUID documentId, String employeeId, String managedGroupId) {
-    return EmployeeDigitalDocumentEventRestrictedOutKey.newBuilder()
-        .setEmployeeId(employeeId)
-        .setManagedGroupId(managedGroupId)
-        .build();
-  }
-
-  private EmployeeDigitalDocumentEventRestrictedOutValue buildValue(
-      UUID documentId, String employeeId, String managedGroupId) {
-    return EmployeeDigitalDocumentEventRestrictedOutValue.newBuilder()
-        .setDigitalDocumentId(documentId.toString())
-        .setEmployeeId(employeeId)
-        .setManagedGroupId(managedGroupId)
-        .build();
-  }
 }

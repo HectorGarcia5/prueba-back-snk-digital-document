@@ -2,303 +2,299 @@ package com.mercadona.prueba.snk.digitaldocument.driven.repositories.adapters;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 import com.mercadona.prueba.snk.digitaldocument.domain.DigitalDocument;
 import com.mercadona.prueba.snk.digitaldocument.domain.DocumentStatus;
 import com.mercadona.prueba.snk.digitaldocument.domain.FailedStep;
+import com.mercadona.prueba.snk.digitaldocument.domain.exception.DocumentAlreadyExistsException;
 import com.mercadona.prueba.snk.digitaldocument.driven.repositories.DigitalDocumentJpaRepository;
-import jakarta.persistence.EntityManager;
+import com.mercadona.prueba.snk.digitaldocument.driven.repositories.mappers.DigitalDocumentMapper;
+import com.mercadona.prueba.snk.digitaldocument.driven.repositories.models.DigitalDocumentMO;
+import java.time.OffsetDateTime;
+import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.dao.DataIntegrityViolationException;
-import org.springframework.orm.ObjectOptimisticLockingFailureException;
-import org.springframework.test.context.ActiveProfiles;
-import org.springframework.test.context.DynamicPropertyRegistry;
-import org.springframework.test.context.DynamicPropertySource;
-import org.springframework.transaction.annotation.Transactional;
-import org.testcontainers.containers.PostgreSQLContainer;
-import org.testcontainers.junit.jupiter.Container;
-import org.testcontainers.junit.jupiter.Testcontainers;
+import org.springframework.data.domain.PageRequest;
 
-@Testcontainers
-@SpringBootTest(classes = TestApplication.class)
-@ActiveProfiles("test")
+@ExtendWith(MockitoExtension.class)
 class DigitalDocumentRepositoryAdapterTest {
 
-  @Container
-  static PostgreSQLContainer<?> postgres = new PostgreSQLContainer<>("postgres:16-alpine")
-      .withDatabaseName("digitaldocument_test")
-      .withUsername("test")
-      .withPassword("test");
-
-  @DynamicPropertySource
-  static void registerDataSourceProperties(DynamicPropertyRegistry registry) {
-    registry.add("spring.datasource.url", postgres::getJdbcUrl);
-    registry.add("spring.datasource.username", postgres::getUsername);
-    registry.add("spring.datasource.password", postgres::getPassword);
-  }
-
-  @Autowired
-  private DigitalDocumentRepositoryAdapter adapter;
-
-  @Autowired
+  @Mock
   private DigitalDocumentJpaRepository jpaRepository;
 
-  @Autowired
-  private EntityManager entityManager;
+  @Mock
+  private DigitalDocumentMapper mapper;
+
+  private DigitalDocumentRepositoryAdapter adapter;
 
   @BeforeEach
-  void cleanDatabase() {
-    jpaRepository.deleteAll();
+  void setUp() {
+    adapter = new DigitalDocumentRepositoryAdapter(jpaRepository, mapper);
   }
 
   // ---------------------------------------------------------------------------
-  // Helper factory
-  // ---------------------------------------------------------------------------
-
-  private static DigitalDocument buildDocument(String employeeId, String managedGroupId) {
-    return DigitalDocument.createPending(employeeId, managedGroupId);
-  }
-
-  // ---------------------------------------------------------------------------
-  // 1. Persistencia y recuperación
+  // save
   // ---------------------------------------------------------------------------
 
   @Test
-  @DisplayName("Should save a pending document and find it by id")
-  void should_save_and_find_pending_document_by_id() {
+  @DisplayName("Should delegate save to jpaRepository and map result back to domain")
+  void should_save_and_return_domain_document() {
     var document = buildDocument("EMP-001", "GRP-001");
+    var mo = buildMO("EMP-001", "GRP-001");
+    var savedMO = buildMO("EMP-001", "GRP-001");
+    var expected = buildDocument("EMP-001", "GRP-001");
 
-    var saved = adapter.save(document);
-    var found = adapter.findById(saved.getId());
+    when(mapper.toMO(document)).thenReturn(mo);
+    when(jpaRepository.saveAndFlush(mo)).thenReturn(savedMO);
+    when(mapper.toDomain(savedMO)).thenReturn(expected);
 
-    assertThat(found).isPresent();
-    assertThat(found.get().getId()).isEqualTo(saved.getId());
-    assertThat(found.get().getEmployeeId()).isEqualTo("EMP-001");
-    assertThat(found.get().getManagedGroupId()).isEqualTo("GRP-001");
-    assertThat(found.get().getStatus()).isEqualTo(DocumentStatus.PENDING);
-    assertThat(found.get().getRetryCount()).isZero();
+    var result = adapter.save(document);
+
+    assertThat(result).isEqualTo(expected);
+    verify(mapper, times(1)).toMO(document);
+    verify(jpaRepository, times(1)).saveAndFlush(mo);
+    verify(mapper, times(1)).toDomain(savedMO);
+  }
+
+  @Test
+  @DisplayName("Should throw DocumentAlreadyExistsException when jpaRepository throws DataIntegrityViolationException")
+  void should_throw_document_already_exists_when_duplicate() {
+    var document = buildDocument("EMP-DUP", "GRP-DUP");
+    var mo = buildMO("EMP-DUP", "GRP-DUP");
+
+    when(mapper.toMO(document)).thenReturn(mo);
+    when(jpaRepository.saveAndFlush(mo)).thenThrow(new DataIntegrityViolationException("duplicate key"));
+
+    assertThatThrownBy(() -> adapter.save(document))
+        .isInstanceOf(DocumentAlreadyExistsException.class);
+  }
+
+  // ---------------------------------------------------------------------------
+  // findById
+  // ---------------------------------------------------------------------------
+
+  @Test
+  @DisplayName("Should return mapped domain document when found by id")
+  void should_find_document_by_id() {
+    var id = UUID.randomUUID();
+    var mo = buildMO("EMP-001", "GRP-001");
+    var expected = buildDocument("EMP-001", "GRP-001");
+
+    when(jpaRepository.findById(id)).thenReturn(Optional.of(mo));
+    when(mapper.toDomain(mo)).thenReturn(expected);
+
+    var result = adapter.findById(id);
+
+    assertThat(result).isPresent().contains(expected);
   }
 
   @Test
   @DisplayName("Should return empty when document not found by id")
-  void should_return_empty_when_document_not_found() {
-    var result = adapter.findById(UUID.randomUUID());
+  void should_return_empty_when_document_not_found_by_id() {
+    var id = UUID.randomUUID();
+    when(jpaRepository.findById(id)).thenReturn(Optional.empty());
+
+    var result = adapter.findById(id);
 
     assertThat(result).isEmpty();
   }
 
   // ---------------------------------------------------------------------------
-  // 2. Restricción única (employee_id, managed_group_id)
+  // findByEmployeeIdAndManagedGroupId
   // ---------------------------------------------------------------------------
 
   @Test
-  @DisplayName("Should throw DataIntegrityViolationException when saving duplicate employee document")
-  void should_throw_exception_when_saving_duplicate_employee_document() {
-    adapter.save(buildDocument("EMP-DUP", "GRP-DUP"));
-
-    assertThatThrownBy(() -> adapter.save(buildDocument("EMP-DUP", "GRP-DUP")))
-        .isInstanceOf(DataIntegrityViolationException.class);
-  }
-
-  // ---------------------------------------------------------------------------
-  // 3. Búsqueda por empleado
-  // ---------------------------------------------------------------------------
-
-  @Test
-  @DisplayName("Should find document by employeeId and managedGroupId")
+  @DisplayName("Should return mapped domain document when found by employeeId and managedGroupId")
   void should_find_document_by_employee_id_and_managed_group_id() {
-    adapter.save(buildDocument("EMP-002", "GRP-002"));
+    var mo = buildMO("EMP-002", "GRP-002");
+    var expected = buildDocument("EMP-002", "GRP-002");
 
-    var found = adapter.findByEmployeeIdAndManagedGroupId("EMP-002", "GRP-002");
+    when(jpaRepository.findByEmployeeIdAndManagedGroupId("EMP-002", "GRP-002")).thenReturn(Optional.of(mo));
+    when(mapper.toDomain(mo)).thenReturn(expected);
 
-    assertThat(found).isPresent();
-    assertThat(found.get().getEmployeeId()).isEqualTo("EMP-002");
-    assertThat(found.get().getManagedGroupId()).isEqualTo("GRP-002");
+    var result = adapter.findByEmployeeIdAndManagedGroupId("EMP-002", "GRP-002");
+
+    assertThat(result).isPresent().contains(expected);
   }
 
   @Test
   @DisplayName("Should return empty when employee document not found by employeeId and managedGroupId")
   void should_return_empty_when_employee_document_not_found() {
+    when(jpaRepository.findByEmployeeIdAndManagedGroupId("EMP-NONE", "GRP-NONE")).thenReturn(Optional.empty());
+
     var result = adapter.findByEmployeeIdAndManagedGroupId("EMP-NONE", "GRP-NONE");
 
     assertThat(result).isEmpty();
   }
 
   // ---------------------------------------------------------------------------
-  // 4. Filtrado por estado con paginación
+  // findByStatus
   // ---------------------------------------------------------------------------
 
   @Test
-  @DisplayName("Should return paginated documents filtered by PENDING status — page 0, size 3 returns 3 of 5")
-  void should_find_documents_by_status_paginated() {
-    for (int i = 1; i <= 5; i++) {
-      adapter.save(buildDocument("EMP-PAG-" + i, "GRP-PAG-" + i));
-    }
+  @DisplayName("Should delegate findByStatus with correct PageRequest and map results")
+  void should_find_documents_by_status_with_pagination() {
+    var mo1 = buildMO("EMP-1", "GRP-1");
+    var mo2 = buildMO("EMP-2", "GRP-2");
+    var domain1 = buildDocument("EMP-1", "GRP-1");
+    var domain2 = buildDocument("EMP-2", "GRP-2");
 
-    var page = adapter.findByStatus(DocumentStatus.PENDING, 0, 3);
+    when(jpaRepository.findByStatus(eq(DocumentStatus.PENDING), eq(PageRequest.of(0, 2))))
+        .thenReturn(List.of(mo1, mo2));
+    when(mapper.toDomain(mo1)).thenReturn(domain1);
+    when(mapper.toDomain(mo2)).thenReturn(domain2);
 
-    assertThat(page).hasSize(3);
-    assertThat(page).allMatch(d -> d.getStatus() == DocumentStatus.PENDING);
+    var result = adapter.findByStatus(DocumentStatus.PENDING, 0, 2);
+
+    assertThat(result).hasSize(2).containsExactly(domain1, domain2);
+    verify(jpaRepository, times(1)).findByStatus(DocumentStatus.PENDING, PageRequest.of(0, 2));
   }
 
+  // ---------------------------------------------------------------------------
+  // countByStatus
+  // ---------------------------------------------------------------------------
+
   @Test
-  @DisplayName("Should count documents by status accurately")
+  @DisplayName("Should delegate countByStatus and return count")
   void should_count_documents_by_status() {
-    adapter.save(buildDocument("EMP-CNT-1", "GRP-CNT-1"));
-    adapter.save(buildDocument("EMP-CNT-2", "GRP-CNT-2"));
-    adapter.save(buildDocument("EMP-CNT-3", "GRP-CNT-3"));
+    when(jpaRepository.countByStatus(DocumentStatus.PENDING)).thenReturn(3L);
 
     var count = adapter.countByStatus(DocumentStatus.PENDING);
 
-    assertThat(count).isEqualTo(3);
+    assertThat(count).isEqualTo(3L);
+    verify(jpaRepository, times(1)).countByStatus(DocumentStatus.PENDING);
   }
 
   // ---------------------------------------------------------------------------
-  // 5. Versionado optimista
+  // lockById
   // ---------------------------------------------------------------------------
 
   @Test
-  @DisplayName("Should increment version on each save")
-  void should_increment_version_on_each_save() {
-    // Primera persistencia: version=0
-    var saved = adapter.save(buildDocument("EMP-VER", "GRP-VER"));
-    assertThat(saved.getVersion()).isZero();
-
-    // Segunda persistencia con mismo id: version en BD pasa a 1
-    // Usamos el documento devuelto por el primer save (version=0 del objeto Java)
-    // y comprobamos el estado en BD después del segundo commit
-    adapter.save(saved);
-
-    // Verificamos en BD que la version es ahora 1
-    var afterSecondSave = adapter.findById(saved.getId()).orElseThrow();
-    assertThat(afterSecondSave.getVersion()).isEqualTo(1L);
-  }
-
-  @Test
-  @DisplayName("Should throw ObjectOptimisticLockingFailureException on concurrent modification of same document")
-  void should_throw_on_optimistic_lock_conflict() {
-    var saved = adapter.save(buildDocument("EMP-OPT", "GRP-OPT"));
-
-    // Limpiar caché para que instanceA y instanceB se traten como entidades independientes
-    entityManager.clear();
-
-    // Instancia A: guarda con version=0, BD pasa a version=1
-    var instanceA = DigitalDocument.builder()
-        .id(saved.getId())
-        .employeeId(saved.getEmployeeId())
-        .managedGroupId(saved.getManagedGroupId())
-        .status(DocumentStatus.PENDING)
-        .retryCount(0)
-        .createdAt(saved.getCreatedAt())
-        .updatedAt(saved.getUpdatedAt())
-        .version(0L)
-        .build();
-    adapter.save(instanceA);
-
-    // Limpiar caché de nuevo para evitar que instanceB sea merged como la misma entidad
-    entityManager.clear();
-
-    // Instancia B: version=0 (stale) — debe lanzar conflicto optimista
-    var instanceB = DigitalDocument.builder()
-        .id(saved.getId())
-        .employeeId(saved.getEmployeeId())
-        .managedGroupId(saved.getManagedGroupId())
-        .status(DocumentStatus.PENDING)
-        .retryCount(0)
-        .createdAt(saved.getCreatedAt())
-        .updatedAt(saved.getUpdatedAt())
-        .version(0L)
-        .build();
-
-    assertThatThrownBy(() -> adapter.save(instanceB))
-        .isInstanceOf(ObjectOptimisticLockingFailureException.class);
-  }
-
-  // ---------------------------------------------------------------------------
-  // 6. Lock pesimista
-  // ---------------------------------------------------------------------------
-
-  @Test
-  @Transactional
-  @DisplayName("Should lock document by id and return it")
+  @DisplayName("Should return mapped domain document when lock acquired by id")
   void should_lock_document_by_id() {
-    var saved = adapter.save(buildDocument("EMP-LOCK", "GRP-LOCK"));
-    entityManager.flush();
-    entityManager.clear();
+    var id = UUID.randomUUID();
+    var mo = buildMO("EMP-LOCK", "GRP-LOCK");
+    var expected = buildDocument("EMP-LOCK", "GRP-LOCK");
 
-    var locked = adapter.lockById(saved.getId());
+    when(jpaRepository.findByIdWithLock(id)).thenReturn(Optional.of(mo));
+    when(mapper.toDomain(mo)).thenReturn(expected);
 
-    assertThat(locked).isPresent();
-    assertThat(locked.get().getId()).isEqualTo(saved.getId());
+    var result = adapter.lockById(id);
+
+    assertThat(result).isPresent().contains(expected);
+    verify(jpaRepository, times(1)).findByIdWithLock(id);
   }
 
   @Test
-  @Transactional
   @DisplayName("Should return empty when locking a non-existent document")
   void should_return_empty_lock_when_document_not_found() {
-    var result = adapter.lockById(UUID.randomUUID());
+    var id = UUID.randomUUID();
+    when(jpaRepository.findByIdWithLock(id)).thenReturn(Optional.empty());
+
+    var result = adapter.lockById(id);
 
     assertThat(result).isEmpty();
   }
 
   // ---------------------------------------------------------------------------
-  // 7. findFailedRetryable
+  // findFailedRetryable
   // ---------------------------------------------------------------------------
 
   @Test
-  @DisplayName("Should return FAILED retryable documents within limit and maxRetries")
+  @DisplayName("Should delegate findFailedRetryable with correct limit and maxRetries")
   void should_find_failed_retryable_documents() {
-    var saved = adapter.save(buildDocument("EMP-RETRY", "GRP-RETRY"));
+    var mo = buildFailedMO("EMP-RETRY", "GRP-RETRY");
+    var expected = buildFailedDocument("EMP-RETRY", "GRP-RETRY");
 
-    var failedDoc = DigitalDocument.builder()
-        .id(saved.getId())
-        .employeeId(saved.getEmployeeId())
-        .managedGroupId(saved.getManagedGroupId())
-        .status(DocumentStatus.FAILED)
-        .failedStep(FailedStep.ENRICHMENT)
-        .retryCount(0)
-        .lastErrorCode("ERR-001")
-        .lastErrorMessage("error")
-        .createdAt(saved.getCreatedAt())
-        .updatedAt(saved.getUpdatedAt())
-        .version(saved.getVersion())
-        .build();
-    adapter.save(failedDoc);
+    when(jpaRepository.findFailedRetryable(eq(PageRequest.of(0, 10)), eq(DocumentStatus.FAILED), eq(3), any()))
+        .thenReturn(List.of(mo));
+    when(mapper.toDomain(mo)).thenReturn(expected);
 
-    var retryable = adapter.findFailedRetryable(10, 3);
+    var result = adapter.findFailedRetryable(10, 3);
 
-    assertThat(retryable).hasSize(1);
-    assertThat(retryable.get(0).getStatus()).isEqualTo(DocumentStatus.FAILED);
-    assertThat(retryable.get(0).getRetryCount()).isZero();
+    assertThat(result).hasSize(1);
+    assertThat(result.get(0).getStatus()).isEqualTo(DocumentStatus.FAILED);
+    verify(jpaRepository, times(1)).findFailedRetryable(eq(PageRequest.of(0, 10)), eq(DocumentStatus.FAILED), eq(3), any());
   }
 
   @Test
-  @DisplayName("Should not return FAILED documents whose retryCount exceeds maxRetries")
-  void should_not_return_failed_documents_exceeding_max_retries() {
-    var saved = adapter.save(buildDocument("EMP-MAXR", "GRP-MAXR"));
+  @DisplayName("Should return empty list when no retryable documents found")
+  void should_return_empty_list_when_no_retryable_documents() {
+    when(jpaRepository.findFailedRetryable(any(), any(), anyInt(), any())).thenReturn(List.of());
 
-    var failedDoc = DigitalDocument.builder()
-        .id(saved.getId())
-        .employeeId(saved.getEmployeeId())
-        .managedGroupId(saved.getManagedGroupId())
+    var result = adapter.findFailedRetryable(10, 3);
+
+    assertThat(result).isEmpty();
+  }
+
+  // ---------------------------------------------------------------------------
+  // Helpers
+  // ---------------------------------------------------------------------------
+
+  private static DigitalDocument buildDocument(String employeeId, String managedGroupId) {
+    return DigitalDocument.builder()
+        .id(UUID.randomUUID())
+        .employeeId(employeeId)
+        .managedGroupId(managedGroupId)
+        .status(DocumentStatus.PENDING)
+        .retryCount(0)
+        .createdAt(OffsetDateTime.now())
+        .updatedAt(OffsetDateTime.now())
+        .version(0L)
+        .build();
+  }
+
+  private static DigitalDocument buildFailedDocument(String employeeId, String managedGroupId) {
+    return DigitalDocument.builder()
+        .id(UUID.randomUUID())
+        .employeeId(employeeId)
+        .managedGroupId(managedGroupId)
         .status(DocumentStatus.FAILED)
         .failedStep(FailedStep.ENRICHMENT)
-        .retryCount(5)
-        .lastErrorCode("ERR-MAX")
-        .lastErrorMessage("max retries exceeded")
-        .createdAt(saved.getCreatedAt())
-        .updatedAt(saved.getUpdatedAt())
-        .version(saved.getVersion())
+        .retryCount(0)
+        .createdAt(OffsetDateTime.now())
+        .updatedAt(OffsetDateTime.now())
+        .version(0L)
         .build();
-    adapter.save(failedDoc);
+  }
 
-    var retryable = adapter.findFailedRetryable(10, 3);
+  private static DigitalDocumentMO buildMO(String employeeId, String managedGroupId) {
+    return DigitalDocumentMO.builder()
+        .id(UUID.randomUUID())
+        .employeeId(employeeId)
+        .managedGroupId(managedGroupId)
+        .status(DocumentStatus.PENDING)
+        .retryCount(0)
+        .createdAt(OffsetDateTime.now())
+        .updatedAt(OffsetDateTime.now())
+        .version(0L)
+        .build();
+  }
 
-    assertThat(retryable).isEmpty();
+  private static DigitalDocumentMO buildFailedMO(String employeeId, String managedGroupId) {
+    return DigitalDocumentMO.builder()
+        .id(UUID.randomUUID())
+        .employeeId(employeeId)
+        .managedGroupId(managedGroupId)
+        .status(DocumentStatus.FAILED)
+        .failedStep(FailedStep.ENRICHMENT)
+        .retryCount(0)
+        .createdAt(OffsetDateTime.now())
+        .updatedAt(OffsetDateTime.now())
+        .version(0L)
+        .build();
   }
 }

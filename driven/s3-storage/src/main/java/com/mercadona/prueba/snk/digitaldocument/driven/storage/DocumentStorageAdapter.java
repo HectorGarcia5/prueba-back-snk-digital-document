@@ -1,6 +1,7 @@
 package com.mercadona.prueba.snk.digitaldocument.driven.storage;
 
-import com.mercadona.framework.cna.buckets.service.BucketService;
+import com.google.common.io.ByteSource;
+import com.mercadona.framework.cna.lib.bucket.service.BucketService;
 import com.mercadona.prueba.snk.digitaldocument.application.model.StorageMetadata;
 import com.mercadona.prueba.snk.digitaldocument.application.ports.driven.DocumentStorage;
 import lombok.RequiredArgsConstructor;
@@ -37,7 +38,7 @@ public class DocumentStorageAdapter implements DocumentStorage {
     );
 
     try {
-      bucketService.upload(bucketId, key, content, metadata);
+      bucketService.upload(bucketId, ByteSource.wrap(content), key, contentType, metadata);
       log.info("event=STORAGE_UPLOADED documentId={} key={}", documentId, key);
       return key;
     } catch (Exception e) {
@@ -61,10 +62,10 @@ public class DocumentStorageAdapter implements DocumentStorage {
     String key = storageKey(documentId);
     try {
       var rawMeta = bucketService.getMetadata(bucketId, key);
-      if (rawMeta == null || rawMeta.getUserMetadata() == null) {
+      if (rawMeta == null || rawMeta.getUserMetaData() == null) {
         return Optional.empty();
       }
-      var userMeta = rawMeta.getUserMetadata();
+      var userMeta = rawMeta.getUserMetaData();
       return Optional.of(StorageMetadata.builder()
           .storageKey(key)
           .documentId(userMeta.getOrDefault(META_DOCUMENT_ID, null))

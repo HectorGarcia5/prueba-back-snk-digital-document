@@ -3,13 +3,13 @@ package com.mercadona.prueba.snk.digitaldocument.driven.repositories.mappers;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import com.mercadona.prueba.snk.digitaldocument.domain.AiCertificationData;
 import com.mercadona.prueba.snk.digitaldocument.domain.DigitalDocument;
 import com.mercadona.prueba.snk.digitaldocument.domain.EmployeeData;
 import com.mercadona.prueba.snk.digitaldocument.driven.repositories.models.DigitalDocumentMO;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
+import org.springframework.beans.factory.annotation.Autowired;
 
 import java.time.LocalDate;
 import java.util.ArrayList;
@@ -18,8 +18,8 @@ import java.util.List;
 @Mapper(componentModel = "spring")
 public abstract class DigitalDocumentMapper {
 
-  private static final ObjectMapper OBJECT_MAPPER =
-      new ObjectMapper().registerModule(new JavaTimeModule());
+  @Autowired
+  protected ObjectMapper objectMapper;
 
   @Mapping(target = "employeeData", expression = "java(toJson(domain.getEmployeeData()))")
   public abstract DigitalDocumentMO toMO(DigitalDocument domain);
@@ -30,7 +30,7 @@ public abstract class DigitalDocumentMapper {
   protected String toJson(EmployeeData data) {
     if (data == null) return null;
     try {
-      return OBJECT_MAPPER.writeValueAsString(data);
+      return objectMapper.writeValueAsString(data);
     } catch (JsonProcessingException e) {
       throw new IllegalStateException("Cannot serialize EmployeeData", e);
     }
@@ -39,7 +39,7 @@ public abstract class DigitalDocumentMapper {
   protected EmployeeData fromJson(String json) {
     if (json == null) return null;
     try {
-      JsonNode root = OBJECT_MAPPER.readTree(json);
+      JsonNode root = objectMapper.readTree(json);
       JsonNode cert = root.path("certification");
       return EmployeeData.builder()
           .employeeId(text(root, "employeeId"))

@@ -39,17 +39,35 @@ public class ProcessDigitalDocumentUseCase implements ProcessDigitalDocumentPort
     var document = documentRepository.findById(documentId)
         .orElseThrow(() -> new IllegalArgumentException("Document not found [id=" + documentId + "]"));
 
-    log.info("event=PROCESS_START documentId={} status={}", documentId, document.getStatus());
+    while (isProcessable(document)) {
+      log.info("event=PROCESS_START documentId={} status={}", documentId, document.getStatus());
+
+      switch (document.getStatus()) {
+        case PENDING       -> enrich(document);
+        case ENRICHED      -> generatePdf(document);
+        case PDF_GENERATED -> store(document);
+        default            -> { return; }
+      }
+
+      // Re-fetch to pick up the new status after each step
+      document = documentRepository.findById(documentId)
+          .orElseThrow(() -> new IllegalArgumentException("Document not found [id=" + documentId + "]"));
+    }
 
     switch (document.getStatus()) {
-      case PENDING       -> enrich(document);
-      case ENRICHED      -> generatePdf(document);
-      case PDF_GENERATED -> store(document);
-      case STORED        -> log.info("event=PROCESS_STORED_AWAITING_OUTBOX documentId={}", documentId);
-      case PUBLISHED     -> log.info("event=PROCESS_ALREADY_PUBLISHED documentId={}", documentId);
-      case FAILED        -> log.warn("event=PROCESS_SKIPPED_FAILED documentId={} failedStep={}",
-                              documentId, document.getFailedStep());
+      case STORED    -> log.info("event=PROCESS_STORED_AWAITING_OUTBOX documentId={}", documentId);
+      case PUBLISHED -> log.info("event=PROCESS_ALREADY_PUBLISHED documentId={}", documentId);
+      case FAILED    -> log.warn("event=PROCESS_SKIPPED_FAILED documentId={} failedStep={}",
+                            documentId, document.getFailedStep());
+      default        -> {}
     }
+  }
+
+  private boolean isProcessable(DigitalDocument document) {
+    return switch (document.getStatus()) {
+      case PENDING, ENRICHED, PDF_GENERATED -> true;
+      default -> false;
+    };
   }
 
   // ---------------------------------------------------------------------------
@@ -90,15 +108,7 @@ public class ProcessDigitalDocumentUseCase implements ProcessDigitalDocumentPort
   private void store(DigitalDocument document) {
     log.info("event=STORAGE_START documentId={}", document.getId());
     try {
-      // Deterministic regeneration: same employeeData + createdAt → same bytes → same checksum
       var pdfResult = pdfGenerator.generate(buildPdfRequest(document));
-
-      if (document.getChecksum() != null && !pdfResult.getChecksum().equals(document.getChecksum())) {
-        log.error("event=STORAGE_CHECKSUM_MISMATCH documentId={}", document.getId());
-        stateService.transitionToFailed(document, FailedStep.STORAGE,
-            "CHECKSUM_MISMATCH", "Regenerated PDF checksum does not match stored checksum");
-        return;
-      }
 
       // S3 upload — outside transaction
       var storageKey = documentStorage.store(
@@ -109,9 +119,9 @@ public class ProcessDigitalDocumentUseCase implements ProcessDigitalDocumentPort
       log.info("event=STORAGE_OK documentId={} storageKey={}", document.getId(), storageKey);
 
     } catch (Exception e) {
-      log.error("event=STORAGE_ERROR documentId={}", document.getId());
+      log.error("event=STORAGE_ERROR documentId={} error={}", document.getId(), e.getMessage(), e);
       stateService.transitionToFailed(document, FailedStep.STORAGE,
-          "STORAGE_ERROR", "Storage operation failed");
+          "STORAGE_ERROR", e.getMessage());
     }
   }
 

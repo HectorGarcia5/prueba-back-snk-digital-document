@@ -11,6 +11,7 @@ import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Component;
 
+import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -64,7 +65,11 @@ public class DigitalDocumentRepositoryAdapter implements DocumentRepository {
 
   @Override
   public List<DigitalDocument> findFailedRetryable(int limit, int maxRetries) {
-    return jpaRepository.findFailedRetryable(limit, maxRetries)
+    return jpaRepository.findFailedRetryable(
+            PageRequest.of(0, limit),
+            DocumentStatus.FAILED,
+            maxRetries,
+            OffsetDateTime.now())
         .stream()
         .map(mapper::toDomain)
         .toList();

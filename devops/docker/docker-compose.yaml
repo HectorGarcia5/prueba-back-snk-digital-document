@@ -120,6 +120,31 @@ services:
         /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:29092 --create --if-not-exists --topic thirdparty.employee.employeedigitaldocument.event.restrictedout.v0.table.cpd --partitions 3 --replication-factor 1
         echo 'Topics Kafka listos'
 
+  # ----------------------------------------------------------------
+  # Confluent Schema Registry — necesario para Avro en SNK y WEB
+  # UI / API: http://localhost:8085
+  # ----------------------------------------------------------------
+  schema-registry:
+    image: confluentinc/cp-schema-registry:7.6.0
+    container_name: dd-schema-registry
+    depends_on:
+      kafka:
+        condition: service_healthy
+    environment:
+      SCHEMA_REGISTRY_HOST_NAME: schema-registry
+      SCHEMA_REGISTRY_KAFKASTORE_BOOTSTRAP_SERVERS: kafka:29092
+      SCHEMA_REGISTRY_LISTENERS: http://0.0.0.0:8085
+    ports:
+      - "8085:8085"
+    networks:
+      - digital-document
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8085/subjects"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+
 volumes:
   postgres-data:
     driver: local
