@@ -7,10 +7,10 @@
 - [x] **Fase 3**: Persistencia PostgreSQL y Flyway — 16 tests (Testcontainers) ✓
 - [x] **Fase 4**: Recepción idempotente del evento (`ReceiveEmployeeEventUseCase`) ✓
 - [x] **Fase 5**: Cliente de enriquecimiento — contrato real cardgenerator + Resilience4j ✓
-- [ ] **Fase 6**: Generación del PDF (`PdfGenerator`)
-- [ ] **Fase 7**: Almacenamiento MinIO (`DocumentStorage` vía `fwkcna-starter-buckets`)
-- [ ] **Fase 8**: Transactional Outbox ← **adelantado** (ver decisión abajo)
-- [ ] **Fase 9**: Orquestación completa (`ProcessDigitalDocumentUseCase`) — STORED + Outbox en una tx
+- [x] **Fase 6**: Generación del PDF — OpenPDF, SHA-256 determinista, regeneración desde `employeeData` + `createdAt` ✓
+- [x] **Fase 7**: Almacenamiento MinIO — `DocumentStorage` vía `fwkcna-starter-buckets`, clave `employee-documents/{documentId}.pdf` ✓
+- [x] **Fase 8**: Transactional Outbox — tabla `outbox_event`, `OutboxEvent` / `PublicationReason`, `FOR UPDATE SKIP LOCKED` ✓
+- [x] **Fase 9**: Orquestación completa — `ProcessDigitalDocumentUseCase` + `DocumentStateService` (STORED + Outbox en una tx) ✓
 - [ ] **Fase 10**: Kafka consumer y publisher
 - [ ] **Fase 11**: Batch de recuperación (BTC micro)
 - [ ] **Fase 12**: API REST de consulta (WEB micro)
@@ -43,3 +43,12 @@
 - Configuración SSL/SASL de Kafka en `application-dev.yml`: pendiente de credenciales de entorno real
 - Dependencias Avro (`employee:1.2.1`, `employeedigitaldocumentv0:1.1.0`) requieren repositorio Maven corporativo y Schema Registry; si no son resolubles públicamente, los adaptadores Kafka quedan aislados detrás de sus puertos
 - `POST /api/v1/utils/documents/publish` del WEB: diseñar en Fase 11 junto al BTC
+
+## Topics Kafka confirmados
+
+| Dirección | Topic completo | Schema |
+|---|---|---|
+| Consumer (entrada) | `thirdparty.employee.employee.event.public.v0.table.cpd` | `employee:1.2.1` |
+| Producer (salida) | `thirdparty.employee.employeedigitaldocument.event.restrictedout.v0.table.cpd` | `employeedigitaldocumentv0:1.1.0` |
+
+**KEY del consumer:** `key.getId()` → employeeId / `key.getManagedGroupId().getId()` → managedGroupId
