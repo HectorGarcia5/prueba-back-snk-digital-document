@@ -145,6 +145,37 @@ services:
       retries: 10
       start_period: 20s
 
+  # ----------------------------------------------------------------
+  # fwkcna-outbox relay — lee o_outbox y publica en Kafka
+  # IMPORTANTE: DATABASE_PARAMS incluye ?currentSchema=digital_document
+  # para que el relay encuentre la tabla en el schema correcto.
+  # ----------------------------------------------------------------
+  outbox-relay:
+    image: docker.artifactory.gcp.mercadona.com/mercadona-adhoc/back/images/fwkcna-outbox:1.0.0
+    container_name: dd-outbox-relay
+    depends_on:
+      postgres:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+      schema-registry:
+        condition: service_healthy
+    environment:
+      SPRING_PROFILES_ACTIVE: "local,postgres,basic,sr-basic"
+      BOOTSTRAP_SERVERS: kafka:29092
+      SCHEMA_REGISTRY_URL: http://schema-registry:8085
+      DATABASE_URL: postgres:5432
+      DATABASE_NAME: digital_document
+      DATABASE_USERNAME: sa
+      DATABASE_PASSWORD: root
+      DATABASE_SCHEMA: digital_document
+      DATABASE_PARAMS: "?currentSchema=digital_document"
+      SLEEP_SECONDS: "10"
+      OTEL_SDK_DISABLED: "true"
+      PUSHGATEWAY_ENABLED: "false"
+    networks:
+      - digital-document
+
 volumes:
   postgres-data:
     driver: local
