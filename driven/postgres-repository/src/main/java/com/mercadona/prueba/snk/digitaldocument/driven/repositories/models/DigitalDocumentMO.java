@@ -52,12 +52,9 @@ public class DigitalDocumentMO {
   @Column(name = "failed_step")
   private FailedStep failedStep;
 
-  // EmployeeData — campos planos (Fase 5 añadirá columnas cuando se conozca el contrato)
-  @Column(name = "emp_employee_id")
-  private String empEmployeeId;
-
-  @Column(name = "emp_managed_group_id")
-  private String empManagedGroupId;
+  // Full enriched employee data serialized as JSON (see V1.1.0 migration)
+  @Column(name = "employee_data", columnDefinition = "TEXT")
+  private String employeeData;
 
   @Column(name = "storage_key")
   private String storageKey;

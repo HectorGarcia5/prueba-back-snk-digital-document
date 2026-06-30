@@ -41,6 +41,20 @@ fwkcna:
 clients:
   certification:
     url: ${CERTIFICATION_API_BASE_PATH:http://localhost:8081}
+    connect-timeout-ms: ${CERTIFICATION_CONNECT_TIMEOUT_MS:3000}
+    read-timeout-ms: ${CERTIFICATION_READ_TIMEOUT_MS:5000}
+
+resilience4j:
+  retry:
+    instances:
+      certificationClient:
+        max-attempts: 3
+        wait-duration: 1s
+        exponential-backoff-multiplier: 2
+        retry-exceptions:
+          - com.mercadona.prueba.snk.digitaldocument.domain.exception.CertificationClientException
+        ignore-exceptions:
+          - com.mercadona.prueba.snk.digitaldocument.domain.exception.EmployeeNotFoundException
 
 management:
   endpoint:
