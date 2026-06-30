@@ -1,8 +1,8 @@
 package com.mercadona.prueba.snk.digitaldocument.application.ports.driving;
 
-import com.mercadona.prueba.snk.digitaldocument.application.usecases.ReceiveEmployeeEventResult;
+import com.mercadona.prueba.snk.digitaldocument.application.usecases.ReceiveEmployeeEventResponse;
 
 public interface ReceiveEmployeeEventPort {
 
-  ReceiveEmployeeEventResult receive(String employeeId, String managedGroupId);
+  ReceiveEmployeeEventResponse receive(String employeeId, String managedGroupId);
 }

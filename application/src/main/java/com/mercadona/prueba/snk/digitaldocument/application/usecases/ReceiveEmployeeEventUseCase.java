@@ -17,39 +17,33 @@ public class ReceiveEmployeeEventUseCase implements ReceiveEmployeeEventPort {
   private final DocumentRepository documentRepository;
 
   /**
-   * Receives an employee event and guarantees idempotence:
-   * <ol>
-   *   <li>Fast path: check if document already exists (covers non-concurrent duplicates).</li>
-   *   <li>Slow path: try to create. The PostgreSQL UNIQUE constraint is the final guarantee.</li>
-   *   <li>Race condition: if concurrent save fails, fetch the winner and classify it.</li>
-   * </ol>
-   * Not annotated with @Transactional intentionally: each repository call runs its own
-   * transaction so the DataIntegrityViolation translated by the adapter doesn't poison
-   * an outer transaction context.
+   * Not @Transactional: each repository call has its own transaction so the
+   * DataIntegrityViolation translated by the adapter doesn't poison an outer tx.
    */
   @Override
-  public ReceiveEmployeeEventResult receive(String employeeId, String managedGroupId) {
+  public ReceiveEmployeeEventResponse receive(String employeeId, String managedGroupId) {
     log.info("event=RECEIVE employeeId={} managedGroupId={}", employeeId, managedGroupId);
 
     var existing = documentRepository.findByEmployeeIdAndManagedGroupId(employeeId, managedGroupId);
     if (existing.isPresent()) {
-      var result = classify(existing.get().getStatus());
+      var doc = existing.get();
+      var result = classify(doc.getStatus());
       log.info("event=DUPLICATE employeeId={} managedGroupId={} result={}", employeeId, managedGroupId, result);
-      return result;
+      return new ReceiveEmployeeEventResponse(result, doc.getId());
     }
 
     try {
       var saved = documentRepository.save(DigitalDocument.createPending(employeeId, managedGroupId));
       log.info("event=CREATED documentId={} employeeId={} managedGroupId={}", saved.getId(), employeeId, managedGroupId);
-      return ReceiveEmployeeEventResult.CREATED;
+      return new ReceiveEmployeeEventResponse(ReceiveEmployeeEventResult.CREATED, saved.getId());
     } catch (DocumentAlreadyExistsException e) {
       log.warn("event=CONCURRENT_DUPLICATE employeeId={} managedGroupId={}", employeeId, managedGroupId);
-      return documentRepository
+      var doc = documentRepository
           .findByEmployeeIdAndManagedGroupId(employeeId, managedGroupId)
-          .map(doc -> classify(doc.getStatus()))
           .orElseThrow(() -> new IllegalStateException(
               "Document must exist after unique constraint violation [employeeId=" + employeeId
               + ", managedGroupId=" + managedGroupId + "]"));
+      return new ReceiveEmployeeEventResponse(classify(doc.getStatus()), doc.getId());
     }
   }
 

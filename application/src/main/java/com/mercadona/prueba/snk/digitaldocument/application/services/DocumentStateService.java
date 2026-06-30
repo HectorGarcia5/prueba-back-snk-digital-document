@@ -8,6 +8,9 @@ import com.mercadona.prueba.snk.digitaldocument.domain.EmployeeData;
 import com.mercadona.prueba.snk.digitaldocument.domain.FailedStep;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+
+import java.time.OffsetDateTime;
+import java.util.UUID;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
@@ -45,6 +48,19 @@ public class DocumentStateService {
     documentRepository.save(document);
     outboxRepository.save(OutboxEvent.createInitial(
         document.getId(), document.getEmployeeId(), document.getManagedGroupId()));
+  }
+
+  /**
+   * Atomically marks the Outbox event as published and transitions the document to PUBLISHED.
+   * Called after Kafka has confirmed the message delivery.
+   */
+  @Transactional
+  public void completePublication(UUID outboxEventId, UUID documentId) {
+    outboxRepository.markPublished(outboxEventId, OffsetDateTime.now());
+    documentRepository.findById(documentId).ifPresent(doc -> {
+      doc.markPublished();
+      documentRepository.save(doc);
+    });
   }
 
   @Transactional

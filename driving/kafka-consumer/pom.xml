@@ -30,6 +30,16 @@
       <artifactId>employee</artifactId>
       <version>1.2.1</version>
     </dependency>
+    <!-- Avro schema: tópico de salida employee-digital-document -->
+    <dependency>
+      <groupId>com.mercadona.kafka.schemas.concepto.thirdparty.employee.employeedigitaldocument</groupId>
+      <artifactId>employeedigitaldocumentv0</artifactId>
+      <version>1.1.0</version>
+    </dependency>
+    <dependency>
+      <groupId>com.fasterxml.jackson.core</groupId>
+      <artifactId>jackson-databind</artifactId>
+    </dependency>
   </dependencies>
 
 </project>
