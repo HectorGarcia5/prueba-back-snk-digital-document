@@ -4,13 +4,13 @@
 
 - [x] **Fase 1**: Esqueleto de los 3 proyectos + vinculación a repos GitHub
 - [x] **Fase 2**: Dominio y máquina de estados (`DigitalDocument`, `DocumentStatus`, `FailedStep`, `EmployeeData`) — 52 tests ✓
-- [ ] **Fase 3**: Persistencia PostgreSQL y Flyway
-- [ ] **Fase 4**: Recepción idempotente del evento (`ReceiveEmployeeEventUseCase`)
-- [ ] **Fase 5**: Cliente de enriquecimiento (API externa cardgenerator)
+- [x] **Fase 3**: Persistencia PostgreSQL y Flyway — 16 tests (Testcontainers) ✓
+- [x] **Fase 4**: Recepción idempotente del evento (`ReceiveEmployeeEventUseCase`) ✓
+- [x] **Fase 5**: Cliente de enriquecimiento — contrato real cardgenerator + Resilience4j ✓
 - [ ] **Fase 6**: Generación del PDF (`PdfGenerator`)
-- [ ] **Fase 7**: Almacenamiento S3/MinIO (`DocumentStorage`)
-- [ ] **Fase 8**: Orquestación del flujo (`ProcessDigitalDocumentUseCase`)
-- [ ] **Fase 9**: Transactional Outbox
+- [ ] **Fase 7**: Almacenamiento MinIO (`DocumentStorage` vía `fwkcna-starter-buckets`)
+- [ ] **Fase 8**: Transactional Outbox ← **adelantado** (ver decisión abajo)
+- [ ] **Fase 9**: Orquestación completa (`ProcessDigitalDocumentUseCase`) — STORED + Outbox en una tx
 - [ ] **Fase 10**: Kafka consumer y publisher
 - [ ] **Fase 11**: Batch de recuperación (BTC micro)
 - [ ] **Fase 12**: API REST de consulta (WEB micro)
@@ -27,17 +27,19 @@
 | Batch en micro propio (BTC) | Escalado independiente; sigue el patrón `labmng-back-btc-recovery` |
 | BTC llama al WEB para publicar | WEB es el Kafka producer de `employee-digital-document`; BTC solo orquesta |
 | Flyway solo en SNK | SNK es dueño del esquema; WEB y BTC acceden en lectura |
-| Outbox para consistencia STORED↔PUBLISHED | Evita publicar en Kafka si el PDF no está almacenado correctamente |
-| `FailedStep` contiene `getRecoveryStatus()` | Evita switch/if en `prepareForRetry()`; el enum lleva la lógica de recuperación |
-| `EmployeeData` como placeholder en Fase 2 | Contrato real de cardgenerator se inspecciona en Fase 5 (Swagger en localhost:8081) |
+| Outbox **antes** de la orquestación completa | STORED + creación OutboxEvent deben ser una sola tx; implementar Outbox primero evita inconsistencia |
+| `FailedStep` contiene `getRecoveryStatus()` | Evita switch/if en `prepareForRetry()`; PUBLICATION → devuelve STORED (reintenta Outbox, no reprocesa PDF) |
+| PDF regenerable determinísticamente | Si cae entre PDF_GENERATED y STORED, regenerar desde `employeeData` persistido + `createdAt`; no se persiste el binario |
+| `digitalDocumentId` en evento Avro | El campo interno del dominio es `id` (UUID); el campo Avro de salida es `digitalDocumentId` |
+| `publicationReason` en OutboxEvent | INITIAL / DUPLICATE_EVENT / MANUAL_RETRY para no bloquear republicaciones legítimas |
+| Kafka at-least-once (deliberado) | Se garantiza: unicidad del documento, nunca publicar antes de almacenar, uno o más envíos del mismo `digitalDocumentId`. El consumidor de `employee-digital-document` debe ser idempotente usando `digitalDocumentId` como clave lógica |
 | Dominio sin anotaciones JPA/Spring | Pureza del dominio; entidades JPA separadas en `driven/postgres-repository` |
 | Backoff exponencial: 60s * 2^retryCount, cap 1h | Balance entre reintento rápido y no saturar servicios externos |
 
 ---
 
-## Pendientes / Limitaciones conocidas
+## Limitaciones conocidas
 
-- `EmployeeData`: los campos concretos se definirán en Fase 5 tras inspeccionar el Swagger de cardgenerator
-- Esquema Avro de `employee-digital-document` (campos `employeeId`, `managedGroupId`, `digitalDocumentId`): resto de campos con valor por defecto según README de apoyo
-- Configuración SSL/SASL de Kafka en `application-dev.yml`: pendiente de credenciales de entorno
+- Configuración SSL/SASL de Kafka en `application-dev.yml`: pendiente de credenciales de entorno real
+- Dependencias Avro (`employee:1.2.1`, `employeedigitaldocumentv0:1.1.0`) requieren repositorio Maven corporativo y Schema Registry; si no son resolubles públicamente, los adaptadores Kafka quedan aislados detrás de sus puertos
 - `POST /api/v1/utils/documents/publish` del WEB: diseñar en Fase 11 junto al BTC
