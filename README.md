@@ -105,10 +105,27 @@ PENDING ──▶ ENRICHED ──▶ PDF_GENERATED ──▶ STORED ──▶ PU
 
 ## Gestión de errores y reintentos
 
-- Cualquier fallo persiste `status=FAILED`, `failed_step` y `last_error_message`.
+### Errores de negocio (procesamiento del documento)
+
+- Cualquier fallo en el pipeline persiste `status=FAILED`, `failed_step` y `last_error_message`.
 - Backoff exponencial: `next_retry_at = NOW() + 1min * 2^retry_count` (máx 1h).
 - El **BTC** (`prueba-back-btc-digital-document`) procesa automáticamente los documentos `FAILED` con `failed_step=PUBLICATION`.
 - El endpoint `POST /api/v1/documents/{id}/retry` (en el WEB) permite reinicio manual del backoff.
+
+### Errores del consumer Kafka (`topic_consumer_error`)
+
+Cuando el consumer recibe un mensaje y falla con una excepción no controlada (ajena al procesamiento normal del documento), el error se persiste en la tabla `topic_consumer_error` y el offset se **acknowledges** — el mensaje no se reintenta, se descarta y el error queda trazado.
+
+| Campo           | Descripción                                      |
+|-----------------|--------------------------------------------------|
+| `tce_topic_name`| Nombre del topic Kafka donde llegó el mensaje    |
+| `event_key`     | Key Avro serializada como JSON                   |
+| `event_payload` | Value Avro serializado como JSON                 |
+| `event_offset`  | Offset del mensaje                               |
+| `error`         | Causa raíz de la excepción                       |
+| `creation_date` | Timestamp del error                              |
+
+La métrica `prueba_snk_error_topicconsume_total` (Micrometer `Gauge`) expone el número de filas de esta tabla en `/actuator/prometheus`, permitiendo alertar si el contador crece.
 
 ---
 
@@ -159,10 +176,11 @@ Puerto: **8080**
 
 | Versión | Descripción                              |
 |---------|------------------------------------------|
-| V1.0.0  | Tabla `digital_document` + índices       |
-| V1.1.0  | Columna `employee_data` (JSON)           |
-| V1.2.0  | Tabla `o_outbox` + secuencia             |
-| V1.3.0  | Tabla `digital_document_recovery_tmp`    |
+| V1.0.0  | Tabla `digital_document` + índices                          |
+| V1.1.0  | Columna `employee_data` (JSON)                              |
+| V1.2.0  | Tabla `o_outbox` + secuencia (Transactional Outbox)          |
+| V1.3.0  | Tabla `digital_document_recovery_tmp` (batch BTC)            |
+| V1.4.0  | Tabla `topic_consumer_error` + índices (errores Kafka)       |
 
 ---
 
@@ -187,3 +205,4 @@ mvn test
 - Los schemas Avro (`employee:1.2.1`, `employeedigitaldocumentv0:1.1.0`) deben estar registrados en el Schema Registry antes del primer mensaje.
 - El PDF no es determinista entre ejecuciones (OpenPDF genera un FileID diferente en cada generación); la comparación de checksums entre pasos se ha desactivado.
 - La configuración de SASL/SSL para Kafka en entornos `dev`/`itg` requiere credenciales corporativas.
+
