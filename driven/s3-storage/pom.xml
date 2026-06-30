@@ -22,7 +22,7 @@
     </dependency>
     <dependency>
       <groupId>com.mercadona.framework.cna</groupId>
-      <artifactId>fwkcna-starter-bucket</artifactId>
+      <artifactId>fwkcna-starter-buckets</artifactId>
     </dependency>
   </dependencies>
 

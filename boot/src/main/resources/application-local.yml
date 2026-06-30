@@ -22,3 +22,18 @@ fwkcna:
 clients:
   certification:
     url: http://localhost:8081
+
+fwkcna:
+  buckets:
+    - id: employee-documents
+      bucket-name: employee-documents
+      enabled: true
+      provider: minio
+      url: http://localhost:9000
+      trust-all-certs: true
+      relax-hostname: true
+      virtual-host-buckets: false
+      signed-operation-token-expiration: 120
+      credentials:
+        access-key: minio
+        secret-key: minio123
