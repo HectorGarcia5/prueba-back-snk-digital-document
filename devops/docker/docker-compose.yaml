@@ -1,0 +1,27 @@
+networks:
+  digital-document:
+    name: digital-document-network
+
+services:
+
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: sa
+      POSTGRES_PASSWORD: root
+      POSTGRES_DB: digital_document
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    networks:
+      - digital-document
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U sa -d digital_document"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  postgres-data:
+    driver: local

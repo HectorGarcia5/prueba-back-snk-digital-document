@@ -10,6 +10,7 @@ spring:
   flyway:
     locations: classpath:migration/versions
     schemas: digital_document
+    create-schemas: true
 
 fwkcna:
   kafka:
