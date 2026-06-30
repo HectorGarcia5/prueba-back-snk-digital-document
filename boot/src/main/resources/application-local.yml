@@ -18,12 +18,6 @@ fwkcna:
       topics:
         input-0: thirdparty.employee.employee.event.public.v0.table.cpd
         groupid-0: thirdparty_employee_employee_prueba-back-snk-digital-document
-
-clients:
-  certification:
-    url: http://localhost:8081
-
-fwkcna:
   buckets:
     - id: employee-documents
       bucket-name: employee-documents
@@ -37,3 +31,7 @@ fwkcna:
       credentials:
         access-key: minio
         secret-key: minio123
+
+clients:
+  certification:
+    url: http://localhost:8081
