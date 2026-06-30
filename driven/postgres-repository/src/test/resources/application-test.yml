@@ -1,0 +1,16 @@
+spring:
+  flyway:
+    locations: classpath:migration/versions
+    schemas: public
+  jpa:
+    hibernate:
+      ddl-auto: none
+    show-sql: false
+
+# Habilitar Flyway (por defecto el starter lo deshabilita via DataMigrationConfiguration)
+fwkcna:
+  jpa:
+    data-migration:
+      disabled: false
+  outbox:
+    enabled: false

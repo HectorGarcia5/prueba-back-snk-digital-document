@@ -1,0 +1,3 @@
+com.mercadona.framework.cna.outbox.avro.jpa.register.config.OutBoxAvroJPARegisterConfiguration
+com.mercadona.framework.cna.outbox.avro.jpa.register.config.OutboxConfig
+com.mercadona.framework.cna.outbox.avro.jpa.register.config.FwkcnaOutboxAvroJPAFactoryBeanPostProcessor
