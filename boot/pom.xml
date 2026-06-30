@@ -32,6 +32,10 @@
       <artifactId>prueba-back-snk-digital-document-s3-storage</artifactId>
     </dependency>
     <dependency>
+      <groupId>com.mercadona.prueba.snk-digital-document</groupId>
+      <artifactId>prueba-back-snk-digital-document-pdf-generator</artifactId>
+    </dependency>
+    <dependency>
       <groupId>com.mercadona.framework.cna</groupId>
       <artifactId>fwkcna-starter-observability-poe</artifactId>
     </dependency>

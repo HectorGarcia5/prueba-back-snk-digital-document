@@ -42,6 +42,11 @@
         <artifactId>prueba-back-snk-digital-document-s3-storage</artifactId>
         <version>${project.version}</version>
       </dependency>
+      <dependency>
+        <groupId>com.mercadona.prueba.snk-digital-document</groupId>
+        <artifactId>prueba-back-snk-digital-document-pdf-generator</artifactId>
+        <version>${project.version}</version>
+      </dependency>
     </dependencies>
   </dependencyManagement>
 
@@ -51,6 +56,7 @@
     <module>driven/postgres-repository</module>
     <module>driven/certification-client</module>
     <module>driven/s3-storage</module>
+    <module>driven/pdf-generator</module>
     <module>boot</module>
   </modules>
 
