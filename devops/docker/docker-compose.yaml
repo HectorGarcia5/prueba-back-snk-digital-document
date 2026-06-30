@@ -4,8 +4,14 @@ networks:
 
 services:
 
+  # ----------------------------------------------------------------
+  # PostgreSQL 16 — BD compartida por los tres micros
+  # BD: digital_document  schema: digital_document
+  # user: sa  password: root
+  # ----------------------------------------------------------------
   postgres:
     image: postgres:16
+    container_name: dd-postgres
     environment:
       POSTGRES_USER: sa
       POSTGRES_PASSWORD: root
@@ -22,9 +28,14 @@ services:
       timeout: 3s
       retries: 10
 
+  # ----------------------------------------------------------------
+  # MinIO — almacenamiento S3 (usado por SNK)
+  # API S3:   http://localhost:9000
+  # Consola:  http://localhost:9090  (user: minio  pass: minio123)
+  # ----------------------------------------------------------------
   minio:
     image: minio/minio:latest
-    container_name: minio-digital-document
+    container_name: dd-minio
     environment:
       MINIO_ROOT_USER: minio
       MINIO_ROOT_PASSWORD: minio123
@@ -44,21 +55,75 @@ services:
 
   minio-init:
     image: minio/mc:latest
+    container_name: dd-minio-init
     depends_on:
       minio:
         condition: service_healthy
     networks:
       - digital-document
-    entrypoint: >
-      /bin/sh -c "
-      /usr/bin/mc alias set local http://minio:9000 minio minio123 --api s3v4;
-      /usr/bin/mc mb --ignore-existing local/employee-documents;
-      /usr/bin/mc anonymous set download local/employee-documents;
-      echo 'Bucket employee-documents ready';
-      "
+    entrypoint:
+      - /bin/sh
+      - -c
+      - |
+        /usr/bin/mc alias set local http://minio:9000 minio minio123 --api s3v4
+        /usr/bin/mc mb --ignore-existing local/employee-documents
+        /usr/bin/mc anonymous set download local/employee-documents
+        echo 'Bucket employee-documents listo'
+
+  # ----------------------------------------------------------------
+  # Kafka 3.7 KRaft (sin Zookeeper)
+  # Bootstrap local: localhost:9092
+  # ----------------------------------------------------------------
+  kafka:
+    image: apache/kafka:3.7.0
+    container_name: dd-kafka
+    environment:
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092,PLAINTEXT_INTERNAL://0.0.0.0:29092,CONTROLLER://0.0.0.0:9093
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:9092,PLAINTEXT_INTERNAL://kafka:29092
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_INTERNAL:PLAINTEXT,CONTROLLER:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT_INTERNAL
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+      CLUSTER_ID: "MkU3OEVBNTcwNTJENDM2Qk"
+    ports:
+      - "9092:9092"
+    volumes:
+      - kafka-data:/var/lib/kafka/data
+    networks:
+      - digital-document
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/kafka/bin/kafka-broker-api-versions.sh --bootstrap-server localhost:9092 > /dev/null 2>&1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 15s
+
+  kafka-init:
+    image: apache/kafka:3.7.0
+    container_name: dd-kafka-init
+    depends_on:
+      kafka:
+        condition: service_healthy
+    networks:
+      - digital-document
+    entrypoint:
+      - /bin/sh
+      - -c
+      - |
+        /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:29092 --create --if-not-exists --topic thirdparty.employee.employee.event.public.v0.table.cpd --partitions 3 --replication-factor 1
+        /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:29092 --create --if-not-exists --topic thirdparty.employee.employeedigitaldocument.event.restrictedout.v0.table.cpd --partitions 3 --replication-factor 1
+        echo 'Topics Kafka listos'
 
 volumes:
   postgres-data:
     driver: local
   minio-data:
+    driver: local
+  kafka-data:
     driver: local
