@@ -44,6 +44,20 @@ clients:
     connect-timeout-ms: ${CERTIFICATION_CONNECT_TIMEOUT_MS:3000}
     read-timeout-ms: ${CERTIFICATION_READ_TIMEOUT_MS:5000}
 
+storage:
+  bucket-id: ${STORAGE_BUCKET_ID:employee-documents}
+
+fwkcna:
+  buckets:
+    - id: ${STORAGE_BUCKET_ID:employee-documents}
+      bucket-name: ${BUCKET_NAME:employee-documents}
+      enabled: true
+      provider: ${BUCKET_PROVIDER:minio}
+      url: ${BUCKET_URL:http://localhost:9000}
+      credentials:
+        access-key: ${BUCKET_ACCESS_KEY:minio}
+        secret-key: ${BUCKET_SECRET_KEY:minio123}
+
 resilience4j:
   retry:
     instances:
